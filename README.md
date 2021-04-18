@@ -62,8 +62,6 @@ slash.RegisterCommands<SlashCommands>();
 ```
 *Make sure that you register them before your `ConnectAsync`*
 
-Note: you can only register ONE class for a single guild, and only one class globally as well. Trying to register more than one will overwrite the previous. However, if you find some use for it, you can register a different class for different guilds.
-
 ## Making Commands!
 On to the exciting part. 
 
