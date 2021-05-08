@@ -116,16 +116,8 @@ namespace DSharpPlus.SlashCommands
                                     var type = parameter.ParameterType;
                                     var parametertype = GetParameterType(type);
 
-                                    DiscordApplicationCommandOptionChoice[] choices = null;
-                                    var choiceattributes = parameter.GetCustomAttributes<ChoiceAttribute>();
-                                    if (choiceattributes.Any())
-                                    {
-                                        choices = Array.Empty<DiscordApplicationCommandOptionChoice>();
-                                        foreach (var att in choiceattributes)
-                                        {
-                                            choices = choices.Append(new DiscordApplicationCommandOptionChoice(att.Name, att.Value)).ToArray();
-                                        }
-                                    }
+                                    DiscordApplicationCommandOptionChoice[] choices = GetChoiceAttributesFromParameter(parameter.GetCustomAttributes<ChoiceAttribute>());
+
                                     options.Add(new DiscordApplicationCommandOption(optionattribute.Name, optionattribute.Description, parametertype, !parameter.IsOptional, choices));
                                 }
                                 var subpayload = new DiscordApplicationCommandOption(commandattribute.Name, commandattribute.Description, ApplicationCommandOptionType.SubCommand, null, null, options);
@@ -160,33 +152,10 @@ namespace DSharpPlus.SlashCommands
                                             throw new ArgumentException("Arguments must have the Option attribute!");
 
                                         var type = parameter.ParameterType;
-                                        ApplicationCommandOptionType parametertype;
-                                        if (ReferenceEquals(type, typeof(string)))
-                                            parametertype = ApplicationCommandOptionType.String;
-                                        else if (ReferenceEquals(type, typeof(long)))
-                                            parametertype = ApplicationCommandOptionType.Integer;
-                                        else if (ReferenceEquals(type, typeof(bool)))
-                                            parametertype = ApplicationCommandOptionType.Boolean;
-                                        else if (ReferenceEquals(type, typeof(DiscordChannel)))
-                                            parametertype = ApplicationCommandOptionType.Channel;
-                                        else if (ReferenceEquals(type, typeof(DiscordUser)))
-                                            parametertype = ApplicationCommandOptionType.User;
-                                        else if (ReferenceEquals(type, typeof(DiscordRole)))
-                                            parametertype = ApplicationCommandOptionType.Role;
-                                        else
-                                            throw new ArgumentException("Cannot convert type! Argument types must be string, long, bool, DiscordChannel, DiscordUser or DiscordRole.");
+                                        ApplicationCommandOptionType parametertype = GetParameterType(type);
 
-                                        DiscordApplicationCommandOptionChoice[] choices = null;
-                                        var choiceattributes = parameter.GetCustomAttributes<ChoiceAttribute>();
-                                        if (choiceattributes.Any())
-                                        {
-                                            choices = Array.Empty<DiscordApplicationCommandOptionChoice>();
-                                            foreach (var att in choiceattributes)
-                                            {
-                                                choices = choices.Append(new DiscordApplicationCommandOptionChoice(att.Name, att.Value)).ToArray();
-                                            }
-                                        }
-
+                                        DiscordApplicationCommandOptionChoice[] choices = GetChoiceAttributesFromParameter(parameter.GetCustomAttributes<ChoiceAttribute>());
+                                        
                                         suboptions.Add(new DiscordApplicationCommandOption(optionattribute.Name, optionattribute.Description, parametertype, !parameter.IsOptional, choices));
                                     }
                                     var subsubpayload = new DiscordApplicationCommandOption(commatt.Name, commatt.Description, ApplicationCommandOptionType.SubCommand, null, null, suboptions);
@@ -222,16 +191,7 @@ namespace DSharpPlus.SlashCommands
                                 var type = parameter.ParameterType;
                                 ApplicationCommandOptionType parametertype = GetParameterType(type);
 
-                                DiscordApplicationCommandOptionChoice[] choices = null;
-                                var choiceattributes = parameter.GetCustomAttributes<ChoiceAttribute>();
-                                if (choiceattributes.Any())
-                                {
-                                    choices = Array.Empty<DiscordApplicationCommandOptionChoice>();
-                                    foreach (var att in choiceattributes)
-                                    {
-                                        choices = choices.Append(new DiscordApplicationCommandOptionChoice(att.Name, att.Value)).ToArray();
-                                    }
-                                }
+                                DiscordApplicationCommandOptionChoice[] choices = GetChoiceAttributesFromParameter(parameter.GetCustomAttributes<ChoiceAttribute>());
 
                                 options.Add(new DiscordApplicationCommandOption(optionattribute.Name, optionattribute.Description, parametertype, !parameter.IsOptional, choices));
                             }
@@ -545,7 +505,7 @@ namespace DSharpPlus.SlashCommands
         }
         private AsyncEvent<SlashCommandsExtension, SlashCommandExecutedEventArgs> _executed;
 
-        internal ApplicationCommandOptionType GetParameterType(Type type)
+        private ApplicationCommandOptionType GetParameterType(Type type)
         {
             ApplicationCommandOptionType parametertype;
             if (ReferenceEquals(type, typeof(string)))
@@ -565,18 +525,19 @@ namespace DSharpPlus.SlashCommands
 
             return parametertype;
         }
+
+        private DiscordApplicationCommandOptionChoice[] GetChoiceAttributesFromParameter(IEnumerable<ChoiceAttribute> choiceattributes)
+        {
+            if (!choiceattributes.Any())
+            {
+                return null;
+            }
+
+            return choiceattributes.Select(att => new DiscordApplicationCommandOptionChoice(att.Name, att.Value)).ToArray();
+        }
+
     }
-
-    /*internal class CommandCreatePayload
-    {
-        [JsonProperty("name")]
-        public string Name;
-        [JsonProperty("description")]
-        public string Description;
-        [JsonProperty("options")]
-        public List<DiscordApplicationCommandOption> Options = new List<DiscordApplicationCommandOption>();
-    }*/
-
+    
     internal class CommandMethod
     {
         public ulong Id;
