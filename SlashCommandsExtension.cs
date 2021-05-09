@@ -305,7 +305,7 @@ namespace DSharpPlus.SlashCommands
 
                     if (ReferenceEquals(parameter.ParameterType, typeof(string)))
                         args.Add(option.Value.ToString());
-                    if (parameter.ParameterType.IsEnum)
+                    else if (parameter.ParameterType.IsEnum)
                         args.Add(Enum.Parse(parameter.ParameterType, (string)option.Value));
                     else if (ReferenceEquals(parameter.ParameterType, typeof(long)))
                         args.Add((long) option.Value);
