@@ -110,7 +110,7 @@ Arguments must have the `Option` attribute, and can only be of type `string`, `l
 
 You can also predefine some choices for the option, with the `Choice` attribute. You can add multiple attributes to add multiple choices. Choices only work for `string` and `long` arguments.
 
-You can also define choices using an enums, see the example bellow.
+You can also define choices using enums, see the example bellow.
 
 Some examples:
 ```cs
