@@ -353,7 +353,7 @@ namespace DSharpPlus.SlashCommands
                         }
                     }
                     else
-                        throw new ArgumentException($"How on earth did that happen");
+                        throw new ArgumentException($"Error resolving interaction");
                 }
             }
 
@@ -401,7 +401,7 @@ namespace DSharpPlus.SlashCommands
                 parametertype = ApplicationCommandOptionType.String;
 
             else
-                throw new ArgumentException("Cannot convert type! Argument types must be string, long, bool, DiscordChannel, DiscordUser or DiscordRole.");
+                throw new ArgumentException("Cannot convert type! Argument types must be string, long, bool, DiscordChannel, DiscordUser, DiscordRole or an Enum.");
 
             return parametertype;
         }
