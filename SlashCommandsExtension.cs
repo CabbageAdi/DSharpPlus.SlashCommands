@@ -106,11 +106,11 @@ namespace DSharpPlus.SlashCommands
 
                                 var options = await ParseParameters(parameters);
     
-                                var subpayload = new DiscordApplicationCommandOption(commandattribute.Name, commandattribute.Description, ApplicationCommandOptionType.SubCommand, null, null, options);
+                                var subpayload = new DiscordApplicationCommandOption(commandattribute.Name, commandattribute.Description, ApplicationCommandOptionType.SubCommand, null, null, options, commandattribute.DefaultPermission);
 
                                 commandmethods.Add(commandattribute.Name, submethod);
 
-                                payload = new DiscordApplicationCommand(payload.Name, payload.Description, payload.Options?.Append(subpayload) ?? new[] { subpayload });
+                                payload = new DiscordApplicationCommand(payload.Name, payload.Description, payload.Options?.Append(subpayload) ?? new[] { subpayload }, payload.DefaultPermission);
 
                                 InternalGroupCommands.Add(new GroupCommand { Name = groupatt.Name, ParentClass = tti, Methods = commandmethods });
                             }
@@ -133,15 +133,15 @@ namespace DSharpPlus.SlashCommands
                                     parameters = parameters.Skip(1).ToArray();
                                     suboptions = suboptions.Concat(await ParseParameters(parameters)).ToList();
                                     
-                                    var subsubpayload = new DiscordApplicationCommandOption(commatt.Name, commatt.Description, ApplicationCommandOptionType.SubCommand, null, null, suboptions);
+                                    var subsubpayload = new DiscordApplicationCommandOption(commatt.Name, commatt.Description, ApplicationCommandOptionType.SubCommand, null, null, suboptions, commatt.DefaultPermission);
                                     options.Add(subsubpayload);
                                     commandmethods.Add(commatt.Name, subsubmethod);
                                 }
 
-                                var subpayload = new DiscordApplicationCommandOption(subgroupatt.Name, subgroupatt.Description, ApplicationCommandOptionType.SubCommandGroup, null, null, options);
+                                var subpayload = new DiscordApplicationCommandOption(subgroupatt.Name, subgroupatt.Description, ApplicationCommandOptionType.SubCommandGroup, null, null, options, subgroupatt.DefaultPermission);
                                 command.SubCommands.Add(new GroupCommand { Name = subgroupatt.Name, ParentClass = subclass, Methods = commandmethods });
                                 InternalSubGroupCommands.Add(command);
-                                payload = new DiscordApplicationCommand(payload.Name, payload.Description, payload.Options?.Append(subpayload) ?? new[] { subpayload });
+                                payload = new DiscordApplicationCommand(payload.Name, payload.Description, payload.Options?.Append(subpayload) ?? new[] { subpayload }, payload.DefaultPermission);
                             }
                             ToUpdate.Add(payload);
                         }
@@ -161,7 +161,7 @@ namespace DSharpPlus.SlashCommands
 
                             InternalCommandMethods.Add(new CommandMethod { Method = method, Name = commandattribute.Name, ParentClass = t });
 
-                            var payload = new DiscordApplicationCommand(commandattribute.Name, commandattribute.Description, options);
+                            var payload = new DiscordApplicationCommand(commandattribute.Name, commandattribute.Description, options, commandattribute.DefaultPermission);
                             ToUpdate.Add(payload);
                         }
                     }
@@ -506,7 +506,9 @@ namespace DSharpPlus.SlashCommands
         public ulong Id;
 
         public string Name;
+
         public MethodInfo Method;
+
         public Type ParentClass;
     }
 
@@ -515,7 +517,9 @@ namespace DSharpPlus.SlashCommands
         public ulong Id;
 
         public string Name;
+
         public Dictionary<string, MethodInfo> Methods = null;
+
         public Type ParentClass;
     }
 
@@ -524,6 +528,7 @@ namespace DSharpPlus.SlashCommands
         public ulong Id;
 
         public string Name;
+
         public List<GroupCommand> SubCommands = new List<GroupCommand>();
     }
 }

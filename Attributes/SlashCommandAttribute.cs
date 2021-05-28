@@ -19,14 +19,20 @@ namespace DSharpPlus.SlashCommands
         public string Description { get; }
 
         /// <summary>
+        /// Gets the default permission of this command
+        /// </summary>
+        public bool DefaultPermission { get; set; }
+
+        /// <summary>
         /// Marks this method as a slash command
         /// </summary>
         /// <param name="name">The name of this slash command</param>
         /// <param name="description">The description of this slash command</param>
-        public SlashCommandAttribute(string name, string description)
+        public SlashCommandAttribute(string name, string description, bool default_permission = true)
         {
             Name = name.ToLower();
             Description = description;
+            DefaultPermission = default_permission;
         }
     }
 }
