@@ -9,15 +9,9 @@ Join the [Discord server](https://discord.gg/2ZhXXVJYhU) for any questions, help
 
 # Documentation
 
-DSharpPlus doesn't currently have a slash command framework. You can use this library to somewhat get an idea of how you can implement slash commands into your bot.
+DSharpPlus doesn't currently have a slash command framework. You can use this library to implement slash commands into your bot.
 
-I have done my best to make this as similar to CommandsNext as possible to make it a smooth experience. However, there are some limitations in comparison. The library does not support:
-
-    Registering or editing commands at runtime
-    Sharding
-    Any pre execution checks
-   
-While you can make commands at runtime, if you have a command class registered for that guild/globally if you're making global commands, it will be overwritten (therefore probably deleted) on the next startup due to the limitations of the bulk overwrite endpoint.
+I have done my best to make this as similar to CommandsNext as possible to make it a smooth experience. However, the library does not support registering or editing commands at runtime. While you can make commands at runtime using the methods on the client, if you have a command class registered for that guild/globally if you're making global commands, it will be overwritten (therefore probably deleted) on the next startup due to the limitations of the bulk overwrite endpoint.
 
 Now, on to the actual guide:
 ## Installing
@@ -147,7 +141,7 @@ public async Task Phrase(InteractionContext ctx,
 }
 
 //Enum choices
-enum MyEnum
+public enum MyEnum
 {
     [ChoiceName("Option 1")]
     option1,
@@ -158,7 +152,7 @@ enum MyEnum
 }
     
 [SlashCommand("enum", "Test enum")]
-public async Task EnumCommand(InteractionContext ctx, MyEnum myEnum = MyEnum.option1)
+public async Task EnumCommand(InteractionContext ctx, [Option("enum", "enum option")]MyEnum myEnum = MyEnum.option1)
 {
     await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent(myEnum.GetName()));
 }
@@ -184,6 +178,41 @@ public async Task ChoiceProviderCommand(InteractionContext ctx,
     await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent(option));
 }
 ```
+
+### Pre-execution checks
+You can define some custom attributes that function as pre-execution checks, working very similarly to `CommandsNext`. Simply create an attribute that inherits `SlashCheckBaseAttribute` and override the methods.
+```cs
+public class RequireUserIdAttribute : SlashCheckBaseAttribute
+{
+    public ulong Id;
+    
+    public RequireUserIdAttribute(ulong id)
+        => Id = id;
+
+    public override async Task<bool> ExecuteChecksAsync(InteractionContext ctx)
+        => ctx.User.Id == Id;
+}
+```
+Then just apply it to your command
+```cs
+[SlashCommand("admin", "runs sneaky admin things")]
+[RequireUserId(0000000000000)]
+public async Task Admin(InteractionContext ctx) { //secrets }
+```
+To provide a custom error message when an execution check fails, hook the `SlashCommandErrored` event on your `SlashCommandsExtension`
+```cs
+SlashCommandsExtension slash = //assigned;
+slash.SlashCommandErrored += async (s, e) =>
+{
+    if(e.Exception is SlashExecutionChecksFailedException slex)
+    {
+        foreach (var check in slex.FailedChecks)
+          if (check is RequireUserIdAttribute att)
+              await e.Context.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent($"Only <@{att.Id}> can run this command!"));
+    }
+};
+```
+
 ### Groups
 You can have slash commands in groups. Their structure is explained [here](https://discord.com/developers/docs/interactions/slash-commands#nested-subcommands-and-groups), I would highly recommend reading it to understand how they work. To register groups you need a container which inherits from `SlashCommandModule`. Inside this container you can register groups of commands:
 ```cs
@@ -191,7 +220,7 @@ public class GroupContainer : SlashCommandModule
 {
     //For a group and subcommands inside the group
     [SlashCommandGroup("group", "description")]
-    public class Group : SlashCommandModule
+    public class Group
     {
         [SlashCommand("command", "description")]
         public async Task Command(InteractionContext ctx) {}
@@ -205,10 +234,10 @@ public class GroupContainer : SlashCommandModule
   
     //For subgroups inside groups
     [SlashCommandGroup("group", "description")]
-    public class Group : SlashCommandModule
+    public class Group
     {
         [SlashCommandGroup("subgroup", "description")]
-        public class SubGroup : SlashCommandModule
+        public class SubGroup
         {
             [SlashCommand("command", "description")]
             public async Task Command(InteractionContext ctx) {}
@@ -221,7 +250,7 @@ public class GroupContainer : SlashCommandModule
         }
     
         [SlashCommandGroup("subgroup2", "description")]
-        public class SubGroup2 : SlashCommandModule
+        public class SubGroup2
         {
             [SlashCommand("command", "description")]
             public async Task Command(InteractionContext ctx) {}
@@ -244,6 +273,24 @@ var slash = discord.UseSlashCommands(new SlashCommandsConfiguration
 });
 ```
 (Thanks to @sssvt-drabek-stepan for adding this)
+
+Property injection is implemented, however static properties will not be replaced. If you wish for a non-static property to be left alone, assign it the `DontInject` attribute. Property Injection can be used like so:
+```cs
+public class Commands : SlashCommandModule
+{
+    public Database Database { private get; set; } // The get accessor is optionally public, but the set accessor must be public.
+
+    [SlashCommand("ping", "Checks the latency between the bot and it's database. Best used to see if the bot is lagging.")]
+    public async Task Ping(InteractionContext context) => await context.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new()
+    {
+        Content = $"Pong! Database latency is {Database.GetPing()}ms."
+    });
+}
+```
+### Sharding
+`UseSlashCommands` -> `UseSlashCommmandsAsync` which returns a dictionary.
+
+You'll have to foreach over it to register events.
 
 # Issues and contributing
 If you find any issues or bugs, you should join the discord server and discuss it. If it's an actual bug, you can create an [issue](https://github.com/IDoEverything/DSharpPlus.SlashCommands/issues). If you would like to contribute or make changes, feel free to open a [pull request](https://github.com/IDoEverything/DSharpPlus.SlashCommands/pulls).
