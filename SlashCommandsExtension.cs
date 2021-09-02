@@ -733,7 +733,7 @@ namespace DSharpPlus.SlashCommands
         }
 
         //Gets the choices from a choice provider
-        private async Task<List<DiscordApplicationCommandOptionChoice>> GetChoiceAttributesFromProvider(IEnumerable<ChoiceProviderAttribute> customAttributes, UInt64? guildId)
+        private async Task<List<DiscordApplicationCommandOptionChoice>> GetChoiceAttributesFromProvider(IEnumerable<ChoiceProviderAttribute> customAttributes, ulong? guildId)
         {
             var choices = new List<DiscordApplicationCommandOptionChoice>();
             foreach (var choiceProviderAttribute in customAttributes)
@@ -810,7 +810,7 @@ namespace DSharpPlus.SlashCommands
         }
 
         //Handles the parameters for a slash command
-        private async Task<List<DiscordApplicationCommandOption>> ParseParameters(ParameterInfo[] parameters, UInt64? guildId)
+        private async Task<List<DiscordApplicationCommandOption>> ParseParameters(ParameterInfo[] parameters, ulong? guildId)
         {
             var options = new List<DiscordApplicationCommandOption>();
             foreach (var parameter in parameters)
