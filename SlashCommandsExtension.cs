@@ -666,8 +666,17 @@ namespace DSharpPlus.SlashCommands
                         else
                             throw new ArgumentException("Error resolving mentionable option.");
                     }
+					else if (parameter.ParameterType == typeof(DiscordEmoji))
+					{
+                        var value = option.Value.ToString();
+
+                        if (DiscordEmoji.TryFromUnicode(Client, value, out var emoji) || DiscordEmoji.TryFromName(Client, value, out emoji))
+                            args.Add(emoji);
+                        else
+                            throw new ArgumentException("Error parsing emoji parameter.");
+					}
                     else
-                        throw new ArgumentException($"Error resolving interaction.");
+                        throw new ArgumentException("Error resolving interaction.");
                 }
             }
 
@@ -846,7 +855,7 @@ namespace DSharpPlus.SlashCommands
         }
 
         /// <summary>
-        /// <para>Refreshes your commands, used for refreshing choice providers or applying commands registered after the ready event on the discord client. 
+        /// <para>Refreshes your commands, used for refreshing choice providers or applying commands registered after the ready event on the discord client.
         /// Should only be run on the slash command extension linked to shard 0 if sharding.</para>
         /// <para>Not recommended and should be avoided since it can make slash commands be unresponsive for a while.</para>
         /// </summary>
