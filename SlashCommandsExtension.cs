@@ -781,30 +781,29 @@ namespace DSharpPlus.SlashCommands
         //Small method to get the parameter's type from its type
         private ApplicationCommandOptionType GetParameterType(Type type)
         {
-            ApplicationCommandOptionType parametertype;
             if (type == typeof(string))
-                parametertype = ApplicationCommandOptionType.String;
+                return ApplicationCommandOptionType.String;
             else if (type == typeof(long) || type == typeof(long?))
-                parametertype = ApplicationCommandOptionType.Integer;
+                return ApplicationCommandOptionType.Integer;
             else if (type == typeof(bool) || type == typeof(bool?))
-                parametertype = ApplicationCommandOptionType.Boolean;
+                return ApplicationCommandOptionType.Boolean;
             else if (type == typeof(double) || type == typeof(double?))
-                parametertype = ApplicationCommandOptionType.Number;
+                return ApplicationCommandOptionType.Number;
             else if (type == typeof(DiscordChannel))
-                parametertype = ApplicationCommandOptionType.Channel;
+                return ApplicationCommandOptionType.Channel;
             else if (type == typeof(DiscordUser))
-                parametertype = ApplicationCommandOptionType.User;
+                return ApplicationCommandOptionType.User;
             else if (type == typeof(DiscordRole))
-                parametertype = ApplicationCommandOptionType.Role;
+                return ApplicationCommandOptionType.Role;
+            else if (type == typeof(DiscordEmoji))
+                return ApplicationCommandOptionType.String;
             else if (type == typeof(SnowflakeObject))
-                parametertype = ApplicationCommandOptionType.Mentionable;
+                return ApplicationCommandOptionType.Mentionable;
             else if (type.IsEnum)
-                parametertype = ApplicationCommandOptionType.String;
+                return ApplicationCommandOptionType.String;
 
             else
                 throw new ArgumentException("Cannot convert type! Argument types must be string, long, bool, double, DiscordChannel, DiscordUser, DiscordRole, SnowflakeObject or an Enum.");
-
-            return parametertype;
         }
 
         //Gets choices from choice attributes
