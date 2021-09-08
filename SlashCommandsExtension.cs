@@ -273,9 +273,9 @@ namespace DSharpPlus.SlashCommands
 
                             //Accounts for lifespans
                             if (module.GetCustomAttribute<SlashModuleLifespanAttribute>() is not null and { Lifespan: SlashModuleLifespan.Singleton })
-							{
-								_singletonModules.Add(CreateInstance(module, _configuration?.Services));
-							}
+                            {
+                                _singletonModules.Add(CreateInstance(module, _configuration?.Services));
+                            }
                         }
 
                         void AddContextMenus(IEnumerable<MethodInfo> contextMethods)
