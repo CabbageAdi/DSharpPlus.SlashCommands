@@ -15,7 +15,7 @@ namespace DSharpPlus.SlashCommands
         public Type ProviderType { get; }
         
         /// <summary>
-        /// Adds a choice provider to this command.
+        /// Adds a choice provider to this command option.
         /// </summary>
         /// <param name="providerType">The type of the provider.</param>
         public ChoiceProviderAttribute(Type providerType)

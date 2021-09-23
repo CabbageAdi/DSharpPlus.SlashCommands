@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -115,6 +116,8 @@ namespace DSharpPlus.SlashCommands
             return Task.CompletedTask;
         }
 
+        #region Registering
+        
         //Method for registering commands for a target from modules
         private void RegisterCommands(IEnumerable<Type> types, ulong? guildId)
         {
@@ -354,6 +357,143 @@ namespace DSharpPlus.SlashCommands
                 }
             });
         }
+        
+                //Handles the parameters for a slash command
+        private async Task<List<DiscordApplicationCommandOption>> ParseParameters(ParameterInfo[] parameters, ulong? guildId)
+        {
+            var options = new List<DiscordApplicationCommandOption>();
+            foreach (var parameter in parameters)
+            {
+                //Gets the attribute
+                var optionattribute = parameter.GetCustomAttribute<OptionAttribute>();
+                if (optionattribute == null)
+                    throw new ArgumentException("Arguments must have the Option attribute!");
+
+                var autocompleteAttribute = parameter.GetCustomAttribute<AutocompleteAttribute>();
+                if (optionattribute.Autocomplete && autocompleteAttribute == null)
+                    throw new ArgumentException("Autocomplete options must have the Autocomplete attribute!");
+                if (!optionattribute.Autocomplete && autocompleteAttribute != null)
+                    throw new ArgumentException("Setting an autocomplete provider requires the option to have autocomplete set to true!");
+
+                //Sets the type
+                var type = parameter.ParameterType;
+                var parametertype = GetParameterType(type);
+
+                //Handles choices
+                //From attributes
+                var choices = GetChoiceAttributesFromParameter(parameter.GetCustomAttributes<ChoiceAttribute>());
+                //From enums
+                if (parameter.ParameterType.IsEnum)
+                {
+                    choices = GetChoiceAttributesFromEnumParameter(parameter.ParameterType);
+                }
+                //From choice provider
+                var choiceProviders = parameter.GetCustomAttributes<ChoiceProviderAttribute>();
+                if (choiceProviders.Any())
+                {
+                    choices = await GetChoiceAttributesFromProvider(choiceProviders, guildId);
+                }
+
+                var channelTypes = parameter.GetCustomAttribute<ChannelTypesAttribute>()?.ChannelTypes ?? null;
+
+                options.Add(new DiscordApplicationCommandOption(optionattribute.Name, optionattribute.Description, parametertype, !parameter.IsOptional, choices, null, channelTypes, optionattribute.Autocomplete));
+            }
+
+            return options;
+        }
+        
+        //Small method to get the parameter's type from its type
+        private ApplicationCommandOptionType GetParameterType(Type type)
+        {
+            if (type == typeof(string))
+                return ApplicationCommandOptionType.String;
+            else if (type == typeof(long) || type == typeof(long?))
+                return ApplicationCommandOptionType.Integer;
+            else if (type == typeof(bool) || type == typeof(bool?))
+                return ApplicationCommandOptionType.Boolean;
+            else if (type == typeof(double) || type == typeof(double?))
+                return ApplicationCommandOptionType.Number;
+            else if (type == typeof(DiscordChannel))
+                return ApplicationCommandOptionType.Channel;
+            else if (type == typeof(DiscordUser))
+                return ApplicationCommandOptionType.User;
+            else if (type == typeof(DiscordRole))
+                return ApplicationCommandOptionType.Role;
+            else if (type == typeof(DiscordEmoji))
+                return ApplicationCommandOptionType.String;
+            else if (type == typeof(SnowflakeObject))
+                return ApplicationCommandOptionType.Mentionable;
+
+            else if (type.IsEnum)
+                return ApplicationCommandOptionType.String;
+
+            else
+                throw new ArgumentException("Cannot convert type! Argument types must be string, long, bool, double, DiscordChannel, DiscordUser, DiscordRole, DiscordEmoji, SnowflakeObject or an Enum.");
+        }
+
+        //Gets the choices from a choice provider
+        private async Task<List<DiscordApplicationCommandOptionChoice>> GetChoiceAttributesFromProvider(
+            IEnumerable<ChoiceProviderAttribute> customAttributes,
+            ulong? guildId
+        )
+        {
+            var choices = new List<DiscordApplicationCommandOptionChoice>();
+            foreach (var choiceProviderAttribute in customAttributes)
+            {
+                var method = choiceProviderAttribute.ProviderType.GetMethod(nameof(IChoiceProvider.Provider));
+
+                if (method == null)
+                    throw new ArgumentException("ChoiceProviders must inherit from IChoiceProvider.");
+                else
+                {
+                    var instance = Activator.CreateInstance(choiceProviderAttribute.ProviderType);
+
+                    // Abstract class offers more properties that can be set
+                    if (choiceProviderAttribute.ProviderType.IsSubclassOf(typeof(ChoiceProvider)))
+                    {
+                        choiceProviderAttribute.ProviderType.GetProperty(nameof(ChoiceProvider.GuildId))
+                            ?.SetValue(instance, guildId);
+
+                        choiceProviderAttribute.ProviderType.GetProperty(nameof(ChoiceProvider.Services))
+                            ?.SetValue(instance, _configuration.Services);
+                    }
+
+                    //Gets the choices from the method
+                    var result = await (Task<IEnumerable<DiscordApplicationCommandOptionChoice>>)method.Invoke(instance, null);
+
+                    if (result.Any())
+                    {
+                        choices.AddRange(result);
+                    }
+                }
+            }
+
+            return choices;
+        }
+
+        //Gets choices from an enum
+        private static List<DiscordApplicationCommandOptionChoice> GetChoiceAttributesFromEnumParameter(Type enumParam)
+        {
+            var choices = new List<DiscordApplicationCommandOptionChoice>();
+            foreach (Enum enumValue in Enum.GetValues(enumParam))
+            {
+                choices.Add(new DiscordApplicationCommandOptionChoice(enumValue.GetName(), enumValue.ToString()));
+            }
+            return choices;
+        }
+
+        //Gets choices from choice attributes
+        private List<DiscordApplicationCommandOptionChoice> GetChoiceAttributesFromParameter(IEnumerable<ChoiceAttribute> choiceattributes)
+        {
+            if (!choiceattributes.Any())
+            {
+                return null;
+            }
+
+            return choiceattributes.Select(att => new DiscordApplicationCommandOptionChoice(att.Name, att.Value)).ToList();
+        }
+        
+        #endregion
 
         private Task InteractionHandler(DiscordClient client, InteractionCreateEventArgs e)
         {
@@ -362,7 +502,7 @@ namespace DSharpPlus.SlashCommands
                 if (e.Interaction.Type == InteractionType.ApplicationCommand)
                 {
                     //Creates the context
-                    InteractionContext context = new InteractionContext
+                    var context = new InteractionContext
                     {
                         Interaction = e.Interaction,
                         Channel = e.Interaction.Channel,
@@ -429,6 +569,40 @@ namespace DSharpPlus.SlashCommands
                         await _slashError.InvokeAsync(this, new SlashCommandErrorEventArgs { Context = context, Exception = ex });
                     }
                 }
+
+                if (e.Interaction.Type == InteractionType.AutoComplete)
+                {
+                    if (_errored)
+                        throw new InvalidOperationException("Slash commands failed to register properly on startup.");
+
+                    //Gets the method for the command
+                    var methods = _commandMethods.Where(x => x.CommandId == e.Interaction.Data.Id);
+                    var groups = _groupCommands.Where(x => x.CommandId == e.Interaction.Data.Id);
+                    var subgroups = _subGroupCommands.Where(x => x.CommandId == e.Interaction.Data.Id);
+                    if (!methods.Any() && !groups.Any() && !subgroups.Any())
+                        throw new InvalidOperationException("An autocomplete interaction was created, but no command was registered for it.");
+
+                    if (methods.Any())
+                    {
+                        var focusedOption = e.Interaction.Data.Options.First(o => o.Focused);
+                        var method = methods.First().Method;
+                        
+                        var option = method.GetParameters().Skip(1).First(p => p.GetCustomAttribute<OptionAttribute>().Name == focusedOption.Name);
+                        var provider = option.GetCustomAttribute<AutocompleteAttribute>().ProviderType;
+                        var providerMethod = provider.GetMethod(nameof(IAutocompleteProvider.Provider));
+                        var providerInstance = Activator.CreateInstance(provider);
+
+                        var context = new AutocompleteContext
+                        {
+                            Interaction = e.Interaction,
+                            Options = e.Interaction.Data.Options.ToList(),
+                            FocusedOption = focusedOption
+                        };
+
+                        var choices = await (Task<IEnumerable<DiscordAutoCompleteChoice>>) providerMethod.Invoke(providerInstance, new[] { context });
+                        await e.Interaction.CreateResponseAsync(InteractionResponseType.AutoCompleteResult, new DiscordInteractionResponseBuilder().AddAutoCompleteChoices(choices));
+                    }
+                }
             });
             return Task.CompletedTask;
         }
@@ -438,7 +612,7 @@ namespace DSharpPlus.SlashCommands
             _ = Task.Run(async () =>
             {
                 //Creates the context
-                ContextMenuContext context = new ContextMenuContext
+                var context = new ContextMenuContext
                 {
                     Interaction = e.Interaction,
                     Channel = e.Interaction.Channel,
@@ -484,7 +658,7 @@ namespace DSharpPlus.SlashCommands
             object classInstance;
 
             //Accounts for lifespans
-            SlashModuleLifespan moduleLifespan = (method.DeclaringType.GetCustomAttribute<SlashModuleLifespanAttribute>() != null ? method.DeclaringType.GetCustomAttribute<SlashModuleLifespanAttribute>()?.Lifespan : SlashModuleLifespan.Transient) ?? SlashModuleLifespan.Transient;
+            var moduleLifespan = (method.DeclaringType.GetCustomAttribute<SlashModuleLifespanAttribute>() != null ? method.DeclaringType.GetCustomAttribute<SlashModuleLifespanAttribute>()?.Lifespan : SlashModuleLifespan.Transient) ?? SlashModuleLifespan.Transient;
             switch (moduleLifespan)
             {
                 case SlashModuleLifespan.Scoped:
@@ -744,135 +918,6 @@ namespace DSharpPlus.SlashCommands
                 if (dict.Any(x => x.Value == false))
                     throw new ContextMenuExecutionChecksFailedException { FailedChecks = dict.Where(x => x.Value == false).Select(x => x.Key).ToList() };
             }
-        }
-
-        //Gets the choices from a choice provider
-        private async Task<List<DiscordApplicationCommandOptionChoice>> GetChoiceAttributesFromProvider(
-            IEnumerable<ChoiceProviderAttribute> customAttributes,
-            ulong? guildId
-        )
-        {
-            var choices = new List<DiscordApplicationCommandOptionChoice>();
-            foreach (var choiceProviderAttribute in customAttributes)
-            {
-                var method = choiceProviderAttribute.ProviderType.GetMethod(nameof(IChoiceProvider.Provider));
-
-                if (method == null)
-                    throw new ArgumentException("ChoiceProviders must inherit from IChoiceProvider.");
-                else
-                {
-                    var instance = Activator.CreateInstance(choiceProviderAttribute.ProviderType);
-
-                    // Abstract class offers more properties that can be set
-                    if (choiceProviderAttribute.ProviderType.IsSubclassOf(typeof(ChoiceProvider)))
-                    {
-                        choiceProviderAttribute.ProviderType.GetProperty(nameof(ChoiceProvider.GuildId))
-                            ?.SetValue(instance, guildId);
-
-                        choiceProviderAttribute.ProviderType.GetProperty(nameof(ChoiceProvider.Services))
-                            ?.SetValue(instance, _configuration.Services);
-                    }
-
-                    //Gets the choices from the method
-                    var result = await (Task<IEnumerable<DiscordApplicationCommandOptionChoice>>)method.Invoke(instance, null);
-
-                    if (result.Any())
-                    {
-                        choices.AddRange(result);
-                    }
-                }
-            }
-
-            return choices;
-        }
-
-        //Gets choices from an enum
-        private static List<DiscordApplicationCommandOptionChoice> GetChoiceAttributesFromEnumParameter(Type enumParam)
-        {
-            var choices = new List<DiscordApplicationCommandOptionChoice>();
-            foreach (Enum enumValue in Enum.GetValues(enumParam))
-            {
-                choices.Add(new DiscordApplicationCommandOptionChoice(enumValue.GetName(), enumValue.ToString()));
-            }
-            return choices;
-        }
-
-        //Small method to get the parameter's type from its type
-        private ApplicationCommandOptionType GetParameterType(Type type)
-        {
-            if (type == typeof(string))
-                return ApplicationCommandOptionType.String;
-            else if (type == typeof(long) || type == typeof(long?))
-                return ApplicationCommandOptionType.Integer;
-            else if (type == typeof(bool) || type == typeof(bool?))
-                return ApplicationCommandOptionType.Boolean;
-            else if (type == typeof(double) || type == typeof(double?))
-                return ApplicationCommandOptionType.Number;
-            else if (type == typeof(DiscordChannel))
-                return ApplicationCommandOptionType.Channel;
-            else if (type == typeof(DiscordUser))
-                return ApplicationCommandOptionType.User;
-            else if (type == typeof(DiscordRole))
-                return ApplicationCommandOptionType.Role;
-            else if (type == typeof(DiscordEmoji))
-                return ApplicationCommandOptionType.String;
-            else if (type == typeof(SnowflakeObject))
-                return ApplicationCommandOptionType.Mentionable;
-
-            else if (type.IsEnum)
-                return ApplicationCommandOptionType.String;
-
-            else
-                throw new ArgumentException("Cannot convert type! Argument types must be string, long, bool, double, DiscordChannel, DiscordUser, DiscordRole, DiscordEmoji, SnowflakeObject or an Enum.");
-        }
-
-        //Gets choices from choice attributes
-        private List<DiscordApplicationCommandOptionChoice> GetChoiceAttributesFromParameter(IEnumerable<ChoiceAttribute> choiceattributes)
-        {
-            if (!choiceattributes.Any())
-            {
-                return null;
-            }
-
-            return choiceattributes.Select(att => new DiscordApplicationCommandOptionChoice(att.Name, att.Value)).ToList();
-        }
-
-        //Handles the parameters for a slash command
-        private async Task<List<DiscordApplicationCommandOption>> ParseParameters(ParameterInfo[] parameters, ulong? guildId)
-        {
-            var options = new List<DiscordApplicationCommandOption>();
-            foreach (var parameter in parameters)
-            {
-                //Gets the attribute
-                var optionattribute = parameter.GetCustomAttribute<OptionAttribute>();
-                if (optionattribute == null)
-                    throw new ArgumentException("Arguments must have the Option attribute!");
-
-                //Sets the type
-                var type = parameter.ParameterType;
-                var parametertype = GetParameterType(type);
-
-                //Handles choices
-                //From attributes
-                var choices = GetChoiceAttributesFromParameter(parameter.GetCustomAttributes<ChoiceAttribute>());
-                //From enums
-                if (parameter.ParameterType.IsEnum)
-                {
-                    choices = GetChoiceAttributesFromEnumParameter(parameter.ParameterType);
-                }
-                //From choice provider
-                var choiceProviders = parameter.GetCustomAttributes<ChoiceProviderAttribute>();
-                if (choiceProviders.Any())
-                {
-                    choices = await GetChoiceAttributesFromProvider(choiceProviders, guildId);
-                }
-
-                var channelTypes = parameter.GetCustomAttribute<ChannelTypesAttribute>()?.ChannelTypes ?? null;
-
-                options.Add(new DiscordApplicationCommandOption(optionattribute.Name, optionattribute.Description, parametertype, !parameter.IsOptional, choices, null, channelTypes));
-            }
-
-            return options;
         }
 
         /// <summary>
